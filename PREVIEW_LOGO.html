@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preview Logo ExamBro v1.0.5</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+      color: white;
+    }
+    .container {
+      max-width: 900px;
+      width: 100%;
+    }
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 12px;
+      text-align: center;
+      text-shadow: 0 2px 12px rgba(0,0,0,0.3);
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 1.1rem;
+      opacity: 0.9;
+      margin-bottom: 40px;
+    }
+    .preview-box {
+      background: rgba(255,255,255,0.95);
+      border-radius: 16px;
+      padding: 40px;
+      margin-bottom: 30px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+      color: #1e293b;
+    }
+    .preview-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: #667eea;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .loading-simulation {
+      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #1a2d5a 100%);
+      border-radius: 12px;
+      padding: 60px 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      color: white;
+    }
+    .logo-showcase {
+      width: 120px;
+      height: 120px;
+      background: rgba(255,255,255,0.95);
+      border-radius: 24px;
+      padding: 12px;
+      border: 3px solid rgba(255,255,255,0.4);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.8s ease;
+    }
+    .logo-showcase img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .app-name {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-shadow: 0 2px 12px rgba(0,0,0,0.4);
+    }
+    .app-sub {
+      text-align: center;
+      opacity: 0.8;
+      line-height: 1.6;
+    }
+    .loading-bar-wrap {
+      width: 260px;
+      height: 4px;
+      background: rgba(255,255,255,0.18);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    .loading-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #60a5fa, #93c5fd, #60a5fa);
+      background-size: 200% 100%;
+      animation: loading 1.6s ease-in-out infinite;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+    }
+    .info-card {
+      background: #f1f5f9;
+      border-left: 4px solid #667eea;
+      padding: 16px;
+      border-radius: 8px;
+    }
+    .info-card h3 {
+      font-size: 0.95rem;
+      color: #667eea;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .info-card p {
+      font-size: 0.9rem;
+      color: #475569;
+      line-height: 1.5;
+    }
+    .download-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: #667eea;
+      color: white;
+      padding: 14px 28px;
+      border-radius: 50px;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 1.05rem;
+      transition: all 0.3s;
+      box-shadow: 0 4px 16px rgba(102,126,234,0.4);
+      margin-top: 20px;
+    }
+    .download-btn:hover {
+      background: #764ba2;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(118,75,162,0.5);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.8); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    @keyframes loading {
+      0% { background-position: 200% 0; width: 25%; }
+      50% { background-position: 0% 0; width: 75%; }
+      100% { background-position: -200% 0; width: 25%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎨 ExamBro v1.0.5 — Update Logo Sekolah</h1>
+    <p class="subtitle">SMA Bina Kasih Nusantara</p>
+
+    <div class="preview-box">
+      <div class="preview-title">
+        <span>📱</span>
+        Preview Splash Screen
+      </div>
+      <div class="loading-simulation">
+        <div class="logo-showcase">
+          <img src="assets/logo-sekolah.png" alt="Logo SMA BKN">
+        </div>
+        <div class="app-name">ExamBro</div>
+        <div class="app-sub">
+          Safe Browser — Mode Ujian<br>
+          SMA Bina Kasih Nusantara
+        </div>
+        <div class="loading-bar-wrap">
+          <div class="loading-bar"></div>
+        </div>
+        <div style="font-size:0.85rem;opacity:0.7;margin-top:10px">
+          Menghubungkan ke server...
+        </div>
+      </div>
+      <p style="margin-top:20px;color:#64748b;font-size:0.9rem">
+        ℹ️ Splash screen ini akan muncul selama <strong>1.8 detik</strong> setiap kali ExamBro dibuka.
+      </p>
+    </div>
+
+    <div class="preview-box">
+      <div class="preview-title">
+        <span>✅</span>
+        Fitur Update v1.0.5
+      </div>
+      <div class="info-grid">
+        <div class="info-card">
+          <h3>Logo Sekolah</h3>
+          <p>Logo SMA BKN sekarang tampil di splash screen dan icon aplikasi (.exe).</p>
+        </div>
+        <div class="info-card">
+          <h3>Koneksi Stabil</h3>
+          <p>Tidak langsung keluar saat jaringan tidak stabil. Jawaban tetap tersimpan.</p>
+        </div>
+        <div class="info-card">
+          <h3>PDF Auto-Retry</h3>
+          <p>PDF soal otomatis retry jika CDN lambat atau gagal. Tombol "Coba Lagi" tersedia.</p>
+        </div>
+        <div class="info-card">
+          <h3>Autosave Jawaban</h3>
+          <p>Jawaban otomatis disimpan ke browser. Tidak hilang meskipun halaman di-reload.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="preview-box" style="text-align:center">
+      <div class="preview-title" style="justify-content:center">
+        <span>📦</span>
+        Download & Instalasi
+      </div>
+      <p style="color:#64748b;margin-bottom:20px">
+        File siap distribusi: <strong>ExamBro-BKN-v1.0.5-win64.zip</strong> (±108 MB)
+      </p>
+      <a href="dist/ExamBro-BKN-v1.0.5-win64.zip" class="download-btn">
+        <span>⬇️</span>
+        Download ExamBro v1.0.5
+      </a>
+      <p style="margin-top:20px;font-size:0.85rem;color:#64748b">
+        Cara install: Extract ZIP → Jalankan <code>ExamBro-BKN-v1.0.5-win64.exe</code> as Administrator
+      </p>
+    </div>
+
+    <div class="preview-box">
+      <div class="preview-title">
+        <span>📝</span>
+        Changelog Lengkap
+      </div>
+      <ul style="color:#475569;line-height:1.8;margin-left:20px">
+        <li><strong>Logo Sekolah:</strong> Tampil di splash screen (120x120px, background putih)</li>
+        <li><strong>Icon Aplikasi:</strong> File .exe dan taskbar menggunakan logo sekolah</li>
+        <li><strong>Koneksi Tidak Stabil:</strong> Delay blur diperpanjang 2.5 detik, cek <code>document.hidden</code></li>
+        <li><strong>PDF Fallback:</strong> CDN utama (cdnjs) → CDN cadangan (unpkg) → tombol Download/Retry</li>
+        <li><strong>Autosave LocalStorage:</strong> Setiap jawaban dipilih langsung tersimpan, restore saat reload</li>
+        <li><strong>Cleanup:</strong> LocalStorage dihapus setelah submit berhasil (manual/auto)</li>
+      </ul>
+    </div>
+
+  </div>
+</body>
+</html>

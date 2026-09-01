@@ -1,0 +1,152 @@
+name: Build ExamBro macOS
+
+# Trigger: manual dispatch ATAU setiap ada push ke repo ini
+on:
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: 'Arsitektur yang di-build'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - both
+          - x64
+          - arm64
+
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────
+  # JOB 1: Build Intel (x64)
+  # ─────────────────────────────────────────────────────────────────
+  build-mac-x64:
+    name: Build macOS Intel (x64)
+    runs-on: macos-latest
+    if: ${{ github.event_name == 'push' || inputs.arch == 'both' || inputs.arch == 'x64' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate icon.icns from icon.png
+        working-directory: assets
+        run: |
+          mkdir -p ExamBro.iconset
+          sips -z 16   16   icon.png --out ExamBro.iconset/icon_16x16.png
+          sips -z 32   32   icon.png --out ExamBro.iconset/icon_16x16@2x.png
+          sips -z 32   32   icon.png --out ExamBro.iconset/icon_32x32.png
+          sips -z 64   64   icon.png --out ExamBro.iconset/icon_32x32@2x.png
+          sips -z 128  128  icon.png --out ExamBro.iconset/icon_128x128.png
+          sips -z 256  256  icon.png --out ExamBro.iconset/icon_128x128@2x.png
+          sips -z 256  256  icon.png --out ExamBro.iconset/icon_256x256.png
+          sips -z 512  512  icon.png --out ExamBro.iconset/icon_256x256@2x.png
+          sips -z 512  512  icon.png --out ExamBro.iconset/icon_512x512.png
+          sips -z 1024 1024 icon.png --out ExamBro.iconset/icon_512x512@2x.png
+          iconutil -c icns ExamBro.iconset -o icon.icns
+          rm -rf ExamBro.iconset
+          ls -lh icon.icns
+
+      - name: Build ExamBro macOS x64
+        run: npm run build:mac
+
+      - name: Create ZIP
+        working-directory: dist
+        run: |
+          zip -r ExamBro-BKN-v1.0.5-mac.zip ExamBro-BKN-v1.0.5-mac-darwin-x64
+          ls -lh ExamBro-BKN-v1.0.5-mac.zip
+
+      - name: Upload artifact (x64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ExamBro-BKN-v1.0.5-mac-x64
+          path: dist/ExamBro-BKN-v1.0.5-mac.zip
+          retention-days: 30
+
+  # ─────────────────────────────────────────────────────────────────
+  # JOB 2: Build Apple Silicon (arm64)
+  # ─────────────────────────────────────────────────────────────────
+  build-mac-arm64:
+    name: Build macOS Apple Silicon (arm64)
+    runs-on: macos-latest
+    if: ${{ github.event_name == 'push' || inputs.arch == 'both' || inputs.arch == 'arm64' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate icon.icns from icon.png
+        working-directory: assets
+        run: |
+          mkdir -p ExamBro.iconset
+          sips -z 16   16   icon.png --out ExamBro.iconset/icon_16x16.png
+          sips -z 32   32   icon.png --out ExamBro.iconset/icon_16x16@2x.png
+          sips -z 32   32   icon.png --out ExamBro.iconset/icon_32x32.png
+          sips -z 64   64   icon.png --out ExamBro.iconset/icon_32x32@2x.png
+          sips -z 128  128  icon.png --out ExamBro.iconset/icon_128x128.png
+          sips -z 256  256  icon.png --out ExamBro.iconset/icon_128x128@2x.png
+          sips -z 256  256  icon.png --out ExamBro.iconset/icon_256x256.png
+          sips -z 512  512  icon.png --out ExamBro.iconset/icon_256x256@2x.png
+          sips -z 512  512  icon.png --out ExamBro.iconset/icon_512x512.png
+          sips -z 1024 1024 icon.png --out ExamBro.iconset/icon_512x512@2x.png
+          iconutil -c icns ExamBro.iconset -o icon.icns
+          rm -rf ExamBro.iconset
+          ls -lh icon.icns
+
+      - name: Build ExamBro macOS arm64
+        run: npm run build:mac:arm
+
+      - name: Create ZIP
+        working-directory: dist
+        run: |
+          zip -r ExamBro-BKN-v1.0.5-mac-arm.zip ExamBro-BKN-v1.0.5-mac-arm-darwin-arm64
+          ls -lh ExamBro-BKN-v1.0.5-mac-arm.zip
+
+      - name: Upload artifact (arm64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ExamBro-BKN-v1.0.5-mac-arm64
+          path: dist/ExamBro-BKN-v1.0.5-mac-arm.zip
+          retention-days: 30
+
+  # ─────────────────────────────────────────────────────────────────
+  # JOB 3: Summary
+  # ─────────────────────────────────────────────────────────────────
+  notify:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs: [build-mac-x64, build-mac-arm64]
+    if: always()
+
+    steps:
+      - name: Print download instructions
+        run: |
+          echo "========================================"
+          echo "  ExamBro macOS Build Selesai!"
+          echo "========================================"
+          echo "Buka: https://github.com/${{ github.repository }}/actions"
+          echo "Klik run ini → scroll ke 'Artifacts' → download:"
+          echo "  - ExamBro-BKN-v1.0.5-mac-x64   (Intel)"
+          echo "  - ExamBro-BKN-v1.0.5-mac-arm64  (M1/M2/M3)"
+          echo "========================================"

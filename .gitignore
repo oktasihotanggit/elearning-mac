@@ -1,0 +1,7 @@
+node_modules/
+dist/
+BKN-CAT-Windows/
+BKN-CAT-source/
+*.log
+.DS_Store
+Thumbs.db

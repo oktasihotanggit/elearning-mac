@@ -1,0 +1,22 @@
+{
+  "name": "exambro-bkn",
+  "version": "1.0.5",
+  "description": "ExamBro - Safe Browser untuk Ujian BKN E-Learning",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "start:mac": "electron . --main=main-mac.js",
+
+    "build:win": "electron-packager . \"ExamBro-BKN-v1.0.5-win64\" --platform=win32 --arch=x64 --icon=assets/icon.ico --out=dist --overwrite --asar --app-version=1.0.5 --ignore=node_modules/.cache --ignore=dist --ignore=BKN-CAT-Windows --ignore=BKN-CAT-source --win32metadata.requested-execution-level=requireAdministrator",
+    "build:win:zip": "npm run build:win && powershell -Command \"Compress-Archive -Path 'dist\\\\ExamBro-BKN-v1.0.5-win64-win32-x64' -DestinationPath 'dist\\\\ExamBro-BKN-v1.0.5-win64.zip' -Force\"",
+
+    "build:mac": "electron-packager . \"ExamBro-BKN-v1.0.5-mac\" --platform=darwin --arch=x64 --icon=assets/icon.icns --out=dist --overwrite --asar --app-version=1.0.5 --app-bundle-id=id.sch.binakasihnusantara.exambro --ignore=node_modules/.cache --ignore=dist --ignore=BKN-CAT-Windows --ignore=BKN-CAT-source --extra-resource=main-mac.js --electron-version=28.3.3",
+    "build:mac:arm": "electron-packager . \"ExamBro-BKN-v1.0.5-mac-arm\" --platform=darwin --arch=arm64 --icon=assets/icon.icns --out=dist --overwrite --asar --app-version=1.0.5 --app-bundle-id=id.sch.binakasihnusantara.exambro --ignore=node_modules/.cache --ignore=dist --ignore=BKN-CAT-Windows --ignore=BKN-CAT-source --extra-resource=main-mac.js --electron-version=28.3.3",
+    "build:mac:zip": "npm run build:mac && zip -r dist/ExamBro-BKN-v1.0.5-mac.zip dist/ExamBro-BKN-v1.0.5-mac-darwin-x64",
+    "build:mac:arm:zip": "npm run build:mac:arm && zip -r dist/ExamBro-BKN-v1.0.5-mac-arm.zip dist/ExamBro-BKN-v1.0.5-mac-darwin-arm64"
+  },
+  "devDependencies": {
+    "electron": "28.3.3",
+    "@electron/packager": "^18.3.5"
+  }
+}
