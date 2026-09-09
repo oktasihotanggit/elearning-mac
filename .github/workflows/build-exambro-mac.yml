@@ -59,6 +59,9 @@ jobs:
           rm -rf ExamBro.iconset
           ls -lh icon.icns
 
+      - name: Use macOS main process
+        run: cp main-mac.js main.js
+
       - name: Build ExamBro macOS x64
         run: npm run build:mac
 
@@ -113,6 +116,9 @@ jobs:
           iconutil -c icns ExamBro.iconset -o icon.icns
           rm -rf ExamBro.iconset
           ls -lh icon.icns
+
+      - name: Use macOS main process
+        run: cp main-mac.js main.js
 
       - name: Build ExamBro macOS arm64
         run: npm run build:mac:arm

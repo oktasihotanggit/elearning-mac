@@ -25,6 +25,8 @@ const CONFIG = {
   ACTIVATE_URL: 'https://elearning.binakasihnusantara.sch.id/exambro_activate.php',
   ALLOWED_DOMAINS: [
     'elearning.binakasihnusantara.sch.id',
+    'localhost',
+    '127.0.0.1',
     'fonts.googleapis.com',
     'fonts.gstatic.com',
     'cdnjs.cloudflare.com',
