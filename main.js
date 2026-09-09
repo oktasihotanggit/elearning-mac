@@ -452,16 +452,14 @@ function createWindow() {
       closeInProgress = true;
       try {
         if (examActive) {
-          const c = dialog.showMessageBoxSync(mainWindow, {
-            type:      'warning',
-            buttons:   ['Lanjutkan Ujian', 'Keluar (Ujian Batal)'],
-            defaultId: 0,
-            cancelId:  0,
-            title:     'Ujian Sedang Berlangsung',
-            message:   'Anda sedang mengerjakan ujian!',
-            detail:    'Keluar sekarang akan membatalkan ujian dan progress tidak tersimpan.\nPastikan sudah kumpulkan jawaban sebelum keluar.',
-          });
-          if (c === 1) { mainWindow.destroy(); app.quit(); }
+          mainWindow.webContents.send('exam-force-submit', 'Keluar via Alt+F4');
+          mainWindow.webContents.send('exam-violation', 'alt_f4_exit');
+          setTimeout(() => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.destroy();
+              app.quit();
+            }
+          }, 1500);
         } else {
           const c = dialog.showMessageBoxSync(mainWindow, {
             type:      'question',
