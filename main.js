@@ -141,6 +141,49 @@ function enableWindowsKey() {
   }
 }
 
+// ── Blokir gestur touchpad (3 jari & 4 jari) ──────────────────────────────────
+let touchpadBlockerProcess = null;
+
+function disableTouchpadGestures() {
+  const psScript = `
+$ErrorActionPreference = 'SilentlyContinue'
+$regPath = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad'
+if (Test-Path $regPath) {
+  Set-ItemProperty -Path $regPath -Name 'ThreeFingerSlideEnabled' -Value 0 -Type DWord
+  Set-ItemProperty -Path $regPath -Name 'FourFingerSlideEnabled' -Value 0 -Type DWord
+}
+`.trim();
+
+  const { spawn } = require('child_process');
+  touchpadBlockerProcess = spawn('powershell', [
+    '-WindowStyle', 'Hidden',
+    '-NonInteractive',
+    '-Command', psScript
+  ], { detached: false, stdio: 'ignore' });
+}
+
+function enableTouchpadGestures() {
+  if (touchpadBlockerProcess) {
+    try { touchpadBlockerProcess.kill(); } catch(e) {}
+    touchpadBlockerProcess = null;
+  }
+  const psScript = `
+$ErrorActionPreference = 'SilentlyContinue'
+$regPath = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad'
+if (Test-Path $regPath) {
+  Set-ItemProperty -Path $regPath -Name 'ThreeFingerSlideEnabled' -Value 1 -Type DWord
+  Set-ItemProperty -Path $regPath -Name 'FourFingerSlideEnabled' -Value 1 -Type DWord
+}
+`.trim();
+
+  const { spawn } = require('child_process');
+  spawn('powershell', [
+    '-WindowStyle', 'Hidden',
+    '-NonInteractive',
+    '-Command', psScript
+  ], { detached: true, stdio: 'ignore' });
+}
+
 // Paksa window overlay penuh — cegah taskbar "mengintip"
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 // Disable DPI awareness override agar pixel mapping akurat di semua resolusi
@@ -224,6 +267,7 @@ function createWindow() {
   if (process.platform === 'win32') {
     hideTaskbar();
     disableWindowsKey();
+    disableTouchpadGestures();
   }
 
   mainWindow = new BrowserWindow({
@@ -392,31 +436,49 @@ function createWindow() {
   });
 
   // ── Close → dialog konfirmasi (Alt+F4 masuk sini) ─────────────────────────
+  let closeInProgress = false;
+
   mainWindow.on('close', (e) => {
+    if (closeInProgress) return;
     e.preventDefault();
-    // Saat ujian aktif: tampilkan peringatan lebih keras
-    if (examActive) {
-      const c = dialog.showMessageBoxSync(mainWindow, {
-        type:      'warning',
-        buttons:   ['Lanjutkan Ujian', 'Keluar (Ujian Batal)'],
-        defaultId: 0,
-        cancelId:  0,
-        title:     '⚠️ Ujian Sedang Berlangsung',
-        message:   'Anda sedang mengerjakan ujian!',
-        detail:    'Keluar sekarang akan membatalkan ujian dan progress tidak tersimpan.\nPastikan sudah kumpulkan jawaban sebelum keluar.',
-      });
-      if (c === 1) mainWindow.destroy();
-    } else {
-      const c = dialog.showMessageBoxSync(mainWindow, {
-        type:      'question',
-        buttons:   ['Tetap di Aplikasi', 'Keluar'],
-        defaultId: 0,
-        cancelId:  0,
-        title:     'Konfirmasi Keluar',
-        message:   'Keluar dari ExamBro?',
-      });
-      if (c === 1) mainWindow.destroy();
-    }
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+
+    mainWindow.focus();
+    mainWindow.setAlwaysOnTop(true, 'screen-saver');
+    mainWindow.moveTop();
+
+    setTimeout(() => {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      closeInProgress = true;
+      try {
+        if (examActive) {
+          const c = dialog.showMessageBoxSync(mainWindow, {
+            type:      'warning',
+            buttons:   ['Lanjutkan Ujian', 'Keluar (Ujian Batal)'],
+            defaultId: 0,
+            cancelId:  0,
+            title:     'Ujian Sedang Berlangsung',
+            message:   'Anda sedang mengerjakan ujian!',
+            detail:    'Keluar sekarang akan membatalkan ujian dan progress tidak tersimpan.\nPastikan sudah kumpulkan jawaban sebelum keluar.',
+          });
+          if (c === 1) { mainWindow.destroy(); app.quit(); }
+        } else {
+          const c = dialog.showMessageBoxSync(mainWindow, {
+            type:      'question',
+            buttons:   ['Tetap di Aplikasi', 'Keluar'],
+            defaultId: 0,
+            cancelId:  0,
+            title:     'Konfirmasi Keluar',
+            message:   'Keluar dari ExamBro?',
+          });
+          if (c === 1) { mainWindow.destroy(); app.quit(); }
+        }
+      } catch (err) {
+        console.error('[ExamBro] Close dialog error:', err);
+      } finally {
+        closeInProgress = false;
+      }
+    }, 50);
   });
 
   mainWindow.on('closed', () => { mainWindow = null; });
@@ -551,6 +613,7 @@ app.on('window-all-closed', () => {
   if (process.platform === 'win32') {
     showTaskbar();
     enableWindowsKey();
+    enableTouchpadGestures();
   }
   if (process.platform !== 'darwin') app.quit();
 });
@@ -562,5 +625,6 @@ app.on('will-quit', () => {
   if (process.platform === 'win32') {
     showTaskbar();
     enableWindowsKey();
+    enableTouchpadGestures();
   }
 });
