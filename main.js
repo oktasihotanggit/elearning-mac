@@ -452,15 +452,55 @@ function createWindow() {
       closeInProgress = true;
       try {
         if (examActive) {
+          mainWindow.setKiosk(false);
+          mainWindow.setFullScreen(false);
+          mainWindow.setAlwaysOnTop(true, 'screen-saver');
+
           mainWindow.webContents.send('exam-force-submit', 'Keluar via Alt+F4');
           mainWindow.webContents.send('exam-violation', 'alt_f4_exit');
-          setTimeout(() => {
-            if (mainWindow && !mainWindow.isDestroyed()) {
-              mainWindow.destroy();
-              app.quit();
-            }
-          }, 1500);
+
+          mainWindow.webContents.executeJavaScript(`
+            (function() {
+              try {
+                var formId = window.location.href.indexOf('pretest') !== -1 ? 'pretestForm' : 'posttestForm';
+                var form = document.getElementById(formId);
+                if (form && !window.__autoSubmitting && !window.__isSubmitting) {
+                  window.isSubmitting = true;
+                  window.__autoSubmitting = true;
+                  window.__isSubmitting = true;
+                  var flag = document.createElement('input');
+                  flag.type = 'hidden';
+                  flag.name = 'auto_submit';
+                  flag.value = 'alt_f4_exit';
+                  form.appendChild(flag);
+                  form.submit();
+                  return 'submitted';
+                }
+              } catch(err) { return 'error:' + err.message; }
+              return 'noform';
+            })();
+          `).then(function(result) {
+            console.log('[ExamBro] Force submit result:', result);
+            setTimeout(() => {
+              if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.destroy();
+                app.quit();
+              }
+            }, 3000);
+          }).catch(function(err) {
+            console.error('[ExamBro] Force submit error:', err);
+            setTimeout(() => {
+              if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.destroy();
+                app.quit();
+              }
+            }, 3000);
+          });
         } else {
+          mainWindow.setKiosk(false);
+          mainWindow.setFullScreen(false);
+          mainWindow.setAlwaysOnTop(true, 'screen-saver');
+
           const c = dialog.showMessageBoxSync(mainWindow, {
             type:      'question',
             buttons:   ['Tetap di Aplikasi', 'Keluar'],
@@ -470,6 +510,12 @@ function createWindow() {
             message:   'Keluar dari ExamBro?',
           });
           if (c === 1) { mainWindow.destroy(); app.quit(); }
+          else {
+            mainWindow.setKiosk(true);
+            mainWindow.setFullScreen(true);
+            mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
+            mainWindow.moveTop();
+          }
         }
       } catch (err) {
         console.error('[ExamBro] Close dialog error:', err);
@@ -624,5 +670,39 @@ app.on('will-quit', () => {
     showTaskbar();
     enableWindowsKey();
     enableTouchpadGestures();
+  }
+});
+
+app.on('before-quit', (e) => {
+  if (examActive && mainWindow && !mainWindow.isDestroyed()) {
+    e.preventDefault();
+    mainWindow.webContents.send('exam-force-submit', 'Keluar via Alt+F4');
+    mainWindow.webContents.executeJavaScript(`
+      (function() {
+        try {
+          var formId = window.location.href.indexOf('pretest') !== -1 ? 'pretestForm' : 'posttestForm';
+          var form = document.getElementById(formId);
+          if (form && !window.__autoSubmitting && !window.__isSubmitting) {
+            window.isSubmitting = true;
+            window.__autoSubmitting = true;
+            window.__isSubmitting = true;
+            var flag = document.createElement('input');
+            flag.type = 'hidden';
+            flag.name = 'auto_submit';
+            flag.value = 'alt_f4_exit';
+            form.appendChild(flag);
+            form.submit();
+            return 'submitted';
+          }
+        } catch(err) { return 'error:' + err.message; }
+        return 'noform';
+      })();
+    `).then(function(result) {
+      console.log('[ExamBro] Before-quit submit result:', result);
+      setTimeout(() => { app.quit(); }, 3000);
+    }).catch(function(err) {
+      console.error('[ExamBro] Before-quit submit error:', err);
+      setTimeout(() => { app.quit(); }, 3000);
+    });
   }
 });
