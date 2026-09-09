@@ -69,15 +69,11 @@ if (!gotLock) {
 }
 
 // ── Sembunyikan Dock macOS ────────────────────────────────────────────────────
-// Mencegah siswa Cmd+Tab ke app lain via Dock bounce
-if (app.dock) {
-  app.dock.hide();
-}
+// Dipanggil di app.whenReady() agar stabil di semua versi macOS
 
-// ── Disable DPI awareness & overlay hints ────────────────────────────────────
-app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
-app.commandLine.appendSwitch('high-dpi-support', '1');
-app.commandLine.appendSwitch('force-device-scale-factor', '1');
+// macOS: disable overlay hints yang tidak relevan
+app.commandLine.appendSwitch('disable-features', 'WidgetLayers');
+app.commandLine.appendSwitch('hide-cursor-store-rate-limit', '1');
 
 // ── Custom User-Agent ─────────────────────────────────────────────────────────
 // Hapus "Electron/x.x.x", tambahkan "ExamBro-SecureBrowser" + keterangan macOS

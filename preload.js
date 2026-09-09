@@ -109,14 +109,14 @@ window.addEventListener('DOMContentLoaded', () => {
   // 2. Blokir keyboard shortcut berbahaya
   //    FIX: Alt+F4 TIDAK diblokir di sini → dialog keluar di main.js yang handle
   document.addEventListener('keydown', (e) => {
+    const tag = e.target.tagName;
+    const isInput = ['INPUT', 'TEXTAREA'].includes(tag) || e.target.isContentEditable;
     const blocked = [
       e.key === 'PrintScreen',
       e.key === 'F12',
-      // F5 / Ctrl+R diblokir hanya saat soal tidak boleh di-refresh
-      // (e.key === 'F5'),
       (e.ctrlKey && e.shiftKey && ['I','i','J','j','K','k','C','c'].includes(e.key)),
       (e.ctrlKey && ['U','u','P','p','W','w','T','t','N','n'].includes(e.key)),
-      (e.metaKey),   // Windows/Super key
+      (e.metaKey && !isInput),
     ];
     if (blocked.some(Boolean)) {
       e.preventDefault();
