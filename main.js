@@ -1,3 +1,27 @@
+/**
+ * ExamBro — BKN E-Learning Secure Browser v1.0.6
+ * Diadaptasi dari BKN-CAT-Windows v1.2.1
+ *
+ * Perbaikan v1.0.6 (fix responsivitas & input macet):
+ * - Shortcut clipboard (Ctrl+C/V/X, Ctrl+P/S, dst) HANYA diblokir saat ujian
+ *   aktif — didaftarkan/dilepas secara dinamis, bukan permanen. Ini yang
+ *   sebelumnya bikin isian text (login, esai) tidak bisa copy-paste sama
+ *   sekali di luar sesi ujian.
+ * - Dialog konfirmasi keluar diubah dari showMessageBoxSync → showMessageBox
+ *   (async) supaya main process TIDAK freeze dan tombol tetap responsif.
+ * - Tambah flag isDialogOpen: timer paksa-fokus (setInterval) & handler
+ *   'blur' berhenti sementara selama dialog native terbuka, supaya tidak
+ *   berebut fokus dengan dialog/input.
+ *
+ * Perbaikan kunci (adopsi dari BKN-CAT, tetap dipertahankan):
+ * - Loading splash screen sebelum loadURL
+ * - isNavigating flag → cegah white screen setelah login
+ * - Custom User-Agent → server mengenali ExamBro
+ * - moveTop() agar window selalu di depan
+ * - Retry otomatis saat did-fail-load
+ * - Dialog concurrent session
+ */
+
 const {
   app, BrowserWindow, session, globalShortcut,
   dialog, powerSaveBlocker, ipcMain
