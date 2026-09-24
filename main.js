@@ -1,26 +1,13 @@
-/**
- * ExamBro — BKN E-Learning Secure Browser v1.0.5
- * Diadaptasi dari BKN-CAT-Windows v1.2.1
- *
- * Perbaikan kunci (adopsi dari BKN-CAT):
- * - Loading splash screen sebelum loadURL
- * - isNavigating flag → cegah white screen setelah login (FIX utama)
- * - Custom User-Agent → server mengenali ExamBro
- * - moveTop() agar window selalu di depan
- * - Retry otomatis saat did-fail-load
- * - Dialog concurrent session
- */
-
 const {
   app, BrowserWindow, session, globalShortcut,
   dialog, powerSaveBlocker, ipcMain
 } = require('electron');
 const path = require('path');
-const fs   = require('fs');
+const fs = require('fs');
 
 // ─── KONFIGURASI ─────────────────────────────────────────────────────────────
 const CONFIG = {
-  EXAM_URL:     'https://elearning.binakasihnusantara.sch.id',
+  EXAM_URL: 'https://elearning.binakasihnusantara.sch.id',
   ACTIVATE_URL: 'https://elearning.binakasihnusantara.sch.id/exambro_activate.php',
   ALLOWED_DOMAINS: [
     'elearning.binakasihnusantara.sch.id',
@@ -30,24 +17,24 @@ const CONFIG = {
     'cdn.jsdelivr.net',
     'unpkg.com',              // PDF.js worker fallback
     'mozilla.github.io',      // PDF.js CDN alternatif
-    'cdn.jsdelivr.net',       // PDF.js, MathJax, Quill
     'code.jquery.com',        // jQuery jika dipakai
     'cdn.mathjax.org',        // MathJax
   ],
-  APP_TITLE:        'ExamBro — BKN E-Learning',
-  APP_VERSION:      '1.0.5',
-  MAX_VIOLATIONS:   3,
-  FOCUS_CHECK_MS:   2000,
+  APP_TITLE: 'ExamBro — BKN E-Learning',
+  APP_VERSION: '1.0.6',
+  MAX_VIOLATIONS: 3,
+  FOCUS_CHECK_MS: 2000,
   LOADING_DELAY_MS: 1800,  // durasi splash screen
 };
 // ─────────────────────────────────────────────────────────────────────────────
 
-let mainWindow     = null;
-let psBlockerId    = null;
+let mainWindow = null;
+let psBlockerId = null;
 let violationCount = 0;
-let examActive     = false;
-let isNavigating   = false;   // FIX BKN-CAT: cegah white screen saat redirect
-let isFocusing     = false;   // guard cegah infinite focus loop
+let examActive = false;
+let isNavigating = false;   // FIX BKN-CAT: cegah white screen saat redirect
+let isFocusing = false;     // guard cegah infinite focus loop
+let isDialogOpen = false;   // FIX v1.0.6: cegah force-focus berebut dgn dialog/input
 
 // ── Cegah multiple instance ───────────────────────────────────────────────────
 const gotLock = app.requestSingleInstanceLock();
@@ -71,19 +58,18 @@ const { exec } = require('child_process');
 
 function hideTaskbar() {
   const ps = `Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class TB { [DllImport("user32.dll")] public static extern IntPtr FindWindow(string a, string b); [DllImport("user32.dll")] public static extern int ShowWindow(IntPtr h, int n); public static void Hide(){ ShowWindow(FindWindow("Shell_TrayWnd",null),0); } }'; [TB]::Hide()`;
-  exec(`powershell -WindowStyle Hidden -NonInteractive -Command "${ps}"`, () => {});
+  exec(`powershell -WindowStyle Hidden -NonInteractive -Command "${ps}"`, () => { });
 }
 
 function showTaskbar() {
   const ps = `Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class TB { [DllImport("user32.dll")] public static extern IntPtr FindWindow(string a, string b); [DllImport("user32.dll")] public static extern int ShowWindow(IntPtr h, int n); public static void Show(){ ShowWindow(FindWindow("Shell_TrayWnd",null),5); } }'; [TB]::Show()`;
-  exec(`powershell -WindowStyle Hidden -NonInteractive -Command "${ps}"`, () => {});
+  exec(`powershell -WindowStyle Hidden -NonInteractive -Command "${ps}"`, () => { });
 }
 
 // Nonaktifkan Windows key menggunakan low-level keyboard hook (berlaku di Windows 11)
 let winKeyBlockerProcess = null;
 
 function disableWindowsKey() {
-  // PowerShell script yang berjalan di background dan intercept Win key
   const psScript = `
 Add-Type -TypeDefinition @'
 using System;
@@ -136,7 +122,7 @@ public class WinKeyBlocker {
 
 function enableWindowsKey() {
   if (winKeyBlockerProcess) {
-    try { winKeyBlockerProcess.kill(); } catch(e) {}
+    try { winKeyBlockerProcess.kill(); } catch (e) { }
     winKeyBlockerProcess = null;
   }
 }
@@ -164,7 +150,7 @@ if (Test-Path $regPath) {
 
 function enableTouchpadGestures() {
   if (touchpadBlockerProcess) {
-    try { touchpadBlockerProcess.kill(); } catch(e) {}
+    try { touchpadBlockerProcess.kill(); } catch (e) { }
     touchpadBlockerProcess = null;
   }
   const psScript = `
@@ -186,13 +172,10 @@ if (Test-Path $regPath) {
 
 // Paksa window overlay penuh — cegah taskbar "mengintip"
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
-// Disable DPI awareness override agar pixel mapping akurat di semua resolusi
 app.commandLine.appendSwitch('high-dpi-support', '1');
 app.commandLine.appendSwitch('force-device-scale-factor', '1');
 
 // ── Custom User-Agent (adopsi BKN-CAT) ───────────────────────────────────────
-// Hapus "Electron/x.x.x" dari UA lalu tambahkan identifier ExamBro
-// Ini yang dibaca PHP: strpos(HTTP_USER_AGENT, 'ExamBro') !== false
 app.userAgentFallback = app.userAgentFallback
   .replace(/Electron\/[\d.]+\s*/, '')
   + ` ExamBro-SecureBrowser/${CONFIG.APP_VERSION}`;
@@ -205,8 +188,8 @@ function saveCookies() {
     .then(cookies => {
       try {
         fs.writeFileSync(COOKIE_FILE, JSON.stringify(cookies), 'utf8');
-      } catch(e) {}
-    }).catch(() => {});
+      } catch (e) { }
+    }).catch(() => { });
 }
 
 function restoreCookies() {
@@ -216,28 +199,27 @@ function restoreCookies() {
     if (!Array.isArray(cookies)) return;
     const now = Math.floor(Date.now() / 1000);
     for (const c of cookies) {
-      // Skip cookie yang sudah expired
       if (c.expirationDate && c.expirationDate < now) continue;
       const details = {
-        url:    CONFIG.EXAM_URL,
-        name:   c.name,
-        value:  c.value,
+        url: CONFIG.EXAM_URL,
+        name: c.name,
+        value: c.value,
         domain: c.domain,
-        path:   c.path || '/',
+        path: c.path || '/',
         secure: c.secure || false,
         httpOnly: c.httpOnly || false,
       };
       if (c.expirationDate) details.expirationDate = c.expirationDate;
-      session.defaultSession.cookies.set(details).catch(() => {});
+      session.defaultSession.cookies.set(details).catch(() => { });
     }
-  } catch(e) {}
+  } catch (e) { }
 }
 
 // ── INJECT HEADER X-ExamBro KE SEMUA REQUEST ─────────────────────────────────
 function setupExamBroHeaders() {
   session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     const headers = details.requestHeaders;
-    headers['X-ExamBro']         = '1';
+    headers['X-ExamBro'] = '1';
     headers['X-ExamBro-Version'] = CONFIG.APP_VERSION;
     callback({ requestHeaders: headers });
   });
@@ -247,10 +229,10 @@ function setupExamBroHeaders() {
 function setupRequestFilter() {
   session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
     try {
-      const url   = new URL(details.url);
+      const url = new URL(details.url);
       const proto = url.protocol;
       if (['data:', 'blob:', 'about:', 'file:'].includes(proto)) return callback({ cancel: false });
-      if (proto !== 'https:' && proto !== 'http:')               return callback({ cancel: false });
+      if (proto !== 'https:' && proto !== 'http:') return callback({ cancel: false });
       const ok = CONFIG.ALLOWED_DOMAINS.some(d =>
         url.hostname === d || url.hostname.endsWith('.' + d)
       );
@@ -263,7 +245,6 @@ function setupRequestFilter() {
 
 // ── BUAT WINDOW ───────────────────────────────────────────────────────────────
 function createWindow() {
-  // Sembunyikan taskbar SEBELUM window dibuat — persis seperti BKN-CAT
   if (process.platform === 'win32') {
     hideTaskbar();
     disableWindowsKey();
@@ -271,30 +252,30 @@ function createWindow() {
   }
 
   mainWindow = new BrowserWindow({
-    width:  1280,
+    width: 1280,
     height: 800,
-    fullscreen:   true,
-    kiosk:        true,
-    frame:        false,
-    alwaysOnTop:  true,
-    resizable:    false,
-    movable:      false,
-    minimizable:  false,
-    maximizable:  false,
-    closable:     false,
-    skipTaskbar:  true,
-    hasShadow:    false,
-    title:        CONFIG.APP_TITLE,
-    icon:         path.join(__dirname, 'assets', 'icon.ico'),
+    fullscreen: true,
+    kiosk: true,
+    frame: false,
+    alwaysOnTop: true,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    closable: false,
+    skipTaskbar: true,
+    hasShadow: false,
+    title: CONFIG.APP_TITLE,
+    icon: path.join(__dirname, 'assets', 'icon.ico'),
     autoHideMenuBar: true,
-    menuBarVisible:  false,
+    menuBarVisible: false,
     webPreferences: {
-      preload:                     path.join(__dirname, 'preload.js'),
-      nodeIntegration:             false,
-      contextIsolation:            true,
-      sandbox:                     true,
-      devTools:                    false,
-      webSecurity:                 true,
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      devTools: false,
+      webSecurity: true,
       allowRunningInsecureContent: false,
     },
   });
@@ -303,12 +284,10 @@ function createWindow() {
   mainWindow.setAlwaysOnTop(true, 'screen-saver');
   mainWindow.moveTop();
 
-  // Set User-Agent eksplisit di webContents agar PHP bisa deteksi ExamBro via HTTP_USER_AGENT
   const ua = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 ExamBro-SecureBrowser/${CONFIG.APP_VERSION}`;
   mainWindow.webContents.setUserAgent(ua);
 
-  // ── SPLASH SCREEN (adopsi BKN-CAT) ─────────────────────────────────────────
-  // Tampilkan loading.html dulu, baru load URL asli setelah LOADING_DELAY_MS
+  // ── SPLASH SCREEN ─────────────────────────────────────────────────────────
   mainWindow.loadFile(path.join(__dirname, 'assets', 'loading.html'));
   mainWindow.webContents.once('did-finish-load', () => {
     setTimeout(() => {
@@ -320,14 +299,13 @@ function createWindow() {
 
   // ── Event navigasi ─────────────────────────────────────────────────────────
   mainWindow.webContents.on('did-start-navigation', () => { isNavigating = true; });
-  mainWindow.webContents.on('did-finish-load',       () => { isNavigating = false; });
+  mainWindow.webContents.on('did-finish-load', () => { isNavigating = false; });
 
-  // FIX: Server-side HTTP redirect (Location header dari PHP login → dashboard)
   mainWindow.webContents.on('will-redirect', (e, url) => {
     if (!isAllowedUrl(url)) {
       e.preventDefault();
     } else {
-      isNavigating = true; // tandai sedang redirect agar blur tidak kirim Escape
+      isNavigating = true;
     }
   });
 
@@ -341,12 +319,11 @@ function createWindow() {
   mainWindow.webContents.on('did-navigate', (e, url) => {
     isNavigating = false;
     const wasActive = examActive;
-    examActive = url.includes('/materi/pretest/') || url.includes('/materi/posttest/');
+    setExamActive(url.includes('/materi/pretest/') || url.includes('/materi/posttest/'));
     if (examActive && !wasActive) {
       violationCount = 0;
       console.log('[ExamBro] Ujian aktif:', url);
     }
-    // Deteksi concurrent session (login dari perangkat lain)
     if (url.includes('concurrent=1') || url.includes('reason=concurrent')) {
       showConcurrentDialog();
     }
@@ -354,13 +331,11 @@ function createWindow() {
 
   mainWindow.webContents.on('did-navigate-in-page', (e, url) => {
     isNavigating = false;
-    examActive = url.includes('/materi/pretest/') || url.includes('/materi/posttest/');
+    setExamActive(url.includes('/materi/pretest/') || url.includes('/materi/posttest/'));
   });
 
-  // Retry otomatis saat gagal load (adopsi BKN-CAT)
   mainWindow.webContents.on('did-fail-load', (e, code, desc, vurl) => {
     isNavigating = false;
-    // code -3 = ERR_ABORTED (cancel oleh redirect), abaikan
     if (code !== -3 && vurl && isAllowedUrl(vurl)) {
       console.log('[ExamBro] Load gagal, retry dalam 2s:', vurl, code);
       setTimeout(() => {
@@ -371,24 +346,22 @@ function createWindow() {
     }
   });
 
-  // ── Blokir window baru ─────────────────────────────────────────────────────
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (isAllowedUrl(url)) mainWindow.loadURL(url);
     return { action: 'deny' };
   });
 
-  // ── Set cookie exambro=1 setiap halaman selesai load ──────────────────────
   mainWindow.webContents.on('did-finish-load', () => {
     session.defaultSession.cookies.set({
-      url:    CONFIG.EXAM_URL,
-      name:   'exambro',
-      value:  '1',
+      url: CONFIG.EXAM_URL,
+      name: 'exambro',
+      value: '1',
       domain: new URL(CONFIG.EXAM_URL).hostname,
-      path:   '/',
+      path: '/',
       secure: true,
       httpOnly: false,
       expirationDate: Math.floor(Date.now() / 1000) + 86400,
-    }).catch(() => {});
+    }).catch(() => { });
   });
 
   // ── Cegah minimize/hide ────────────────────────────────────────────────────
@@ -405,7 +378,6 @@ function createWindow() {
     if (examActive) handleViolation('hide');
   });
   mainWindow.on('leave-full-screen', () => {
-    // Paksa balik fullscreen + kiosk jika entah bagaimana keluar
     setTimeout(() => {
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.setKiosk(true);
@@ -416,17 +388,17 @@ function createWindow() {
     }, 50);
   });
 
-  // ── Tangani blur (adopsi BKN-CAT dengan perbaikan) ────────────────────────
-  // FIX: JANGAN kirim Escape saat isNavigating — ini penyebab white screen!
+  // ── Tangani blur ──────────────────────────────────────────────────────────
+  // FIX v1.0.6: jangan rebut fokus kalau dialog native sedang terbuka —
+  // ini penyebab input/tombol terasa "nyangkut" saat dialog konfirmasi muncul.
   mainWindow.on('blur', () => {
-    if (isFocusing) return;
+    if (isFocusing || isDialogOpen) return;
     isFocusing = true;
     setTimeout(() => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow && !mainWindow.isDestroyed() && !isDialogOpen) {
         mainWindow.focus();
         mainWindow.setAlwaysOnTop(true, 'screen-saver');
         mainWindow.moveTop();
-        // Kirim Escape hanya saat ujian aktif DAN tidak sedang navigasi/redirect
         if (examActive && !isNavigating) {
           mainWindow.webContents.send('exam-violation', 'window_blur');
         }
@@ -450,77 +422,85 @@ function createWindow() {
     setTimeout(() => {
       if (!mainWindow || mainWindow.isDestroyed()) return;
       closeInProgress = true;
-      try {
-        if (examActive) {
-          mainWindow.setKiosk(false);
-          mainWindow.setFullScreen(false);
-          mainWindow.setAlwaysOnTop(true, 'screen-saver');
 
-          mainWindow.webContents.send('exam-force-submit', 'Keluar via Alt+F4');
-          mainWindow.webContents.send('exam-violation', 'alt_f4_exit');
+      if (examActive) {
+        mainWindow.setKiosk(false);
+        mainWindow.setFullScreen(false);
+        mainWindow.setAlwaysOnTop(true, 'screen-saver');
 
-          mainWindow.webContents.executeJavaScript(`
-            (function() {
-              try {
-                var formId = window.location.href.indexOf('pretest') !== -1 ? 'pretestForm' : 'posttestForm';
-                var form = document.getElementById(formId);
-                if (form && !window.__autoSubmitting && !window.__isSubmitting) {
-                  window.isSubmitting = true;
-                  window.__autoSubmitting = true;
-                  window.__isSubmitting = true;
-                  var flag = document.createElement('input');
-                  flag.type = 'hidden';
-                  flag.name = 'auto_submit';
-                  flag.value = 'alt_f4_exit';
-                  form.appendChild(flag);
-                  form.submit();
-                  return 'submitted';
-                }
-              } catch(err) { return 'error:' + err.message; }
-              return 'noform';
-            })();
-          `).then(function(result) {
-            console.log('[ExamBro] Force submit result:', result);
+        mainWindow.webContents.send('exam-force-submit', 'Keluar via Alt+F4');
+        mainWindow.webContents.send('exam-violation', 'alt_f4_exit');
+
+        mainWindow.webContents.executeJavaScript(`
+        (function() {
+          try {
+            var formId = window.location.href.indexOf('pretest') !== -1 ? 'pretestForm' : 'posttestForm';
+            var form = document.getElementById(formId);
+            if (form && !window.__autoSubmitting && !window.__isSubmitting) {
+              window.isSubmitting = true;
+              window.__autoSubmitting = true;
+              window.__isSubmitting = true;
+              var flag = document.createElement('input');
+              flag.type = 'hidden';
+              flag.name = 'auto_submit';
+              flag.value = 'alt_f4_exit';
+              form.appendChild(flag);
+              form.submit();
+              return 'submitted';
+            }
+          } catch(err) { return 'error:' + err.message; }
+          return 'noform';
+        })();
+      `)
+          .then((result) => console.log('[ExamBro] Force submit result:', result))
+          .catch((err) => console.error('[ExamBro] Force submit error:', err))
+          .finally(() => {
             setTimeout(() => {
               if (mainWindow && !mainWindow.isDestroyed()) {
                 mainWindow.destroy();
                 app.quit();
               }
-            }, 3000);
-          }).catch(function(err) {
-            console.error('[ExamBro] Force submit error:', err);
-            setTimeout(() => {
-              if (mainWindow && !mainWindow.isDestroyed()) {
-                mainWindow.destroy();
-                app.quit();
-              }
+              closeInProgress = false;
             }, 3000);
           });
-        } else {
+      } else {
+        // FIX v1.0.6: dialog ASYNC (bukan Sync) supaya main process & tombol
+        // tetap responsif, tidak freeze menunggu dialog ditutup.
+        try {
           mainWindow.setKiosk(false);
           mainWindow.setFullScreen(false);
           mainWindow.setAlwaysOnTop(true, 'screen-saver');
 
-          const c = dialog.showMessageBoxSync(mainWindow, {
-            type:      'question',
-            buttons:   ['Tetap di Aplikasi', 'Keluar'],
+          isDialogOpen = true;
+          dialog.showMessageBox(mainWindow, {
+            type: 'question',
+            buttons: ['Tetap di Aplikasi', 'Keluar'],
             defaultId: 0,
-            cancelId:  0,
-            title:     'Konfirmasi Keluar',
-            message:   'Keluar dari ExamBro?',
+            cancelId: 0,
+            title: 'Konfirmasi Keluar',
+            message: 'Keluar dari ExamBro?',
+          }).then(({ response }) => {
+            isDialogOpen = false;
+            if (response === 1) {
+              mainWindow.destroy();
+              app.quit();
+            } else {
+              mainWindow.setKiosk(true);
+              mainWindow.setFullScreen(true);
+              mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
+              mainWindow.moveTop();
+            }
+            closeInProgress = false;
+          }).catch((err) => {
+            console.error('[ExamBro] Close dialog error:', err);
+            isDialogOpen = false;
+            closeInProgress = false;
           });
-          if (c === 1) { mainWindow.destroy(); app.quit(); }
-          else {
-            mainWindow.setKiosk(true);
-            mainWindow.setFullScreen(true);
-            mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
-            mainWindow.moveTop();
-          }
+        } catch (err) {
+          console.error('[ExamBro] Close dialog error:', err);
+          isDialogOpen = false;
+          closeInProgress = false;
         }
-      } catch (err) {
-        console.error('[ExamBro] Close dialog error:', err);
-      } finally {
-        closeInProgress = false;
       }
     }, 50);
   });
@@ -542,7 +522,7 @@ ipcMain.on('exam-violation-report', (event, type) => {
 });
 
 ipcMain.on('exam-status', (event, status) => {
-  examActive = (status === 'active');
+  setExamActive(status === 'active');
   if (!examActive) violationCount = 0;
   console.log('[ExamBro] Status ujian:', status);
 });
@@ -553,33 +533,42 @@ function handleViolation(type) {
 }
 
 // ── SHORTCUT BLOCKER ──────────────────────────────────────────────────────────
-function registerShortcuts() {
-  // Adopsi list lengkap dari BKN-CAT + tambahan
-  const blocked = [
-    // Windows system
-    'Super+D', 'Super+L', 'Super+Tab', 'Super+E', 'Super+R',
-    'Super+X', 'Super+S', 'Super+A', 'Super+M', 'Super+H',
-    'Super+Shift+S', 'Super+I', 'Super',
-    // Task switch (Alt+F4 dibiarkan → dialog keluar)
-    'Alt+Tab', 'Alt+Shift+Tab', 'Alt+Escape', 'Ctrl+Escape',
-    // Browser / dev tools
-    'F11', 'F12', 'F5',
-    'Ctrl+R', 'Ctrl+Shift+R', 'Ctrl+F5',
-    'Ctrl+W', 'Ctrl+T', 'Ctrl+N', 'Ctrl+Shift+N',
-    'Ctrl+Tab', 'Ctrl+Shift+Tab',
-    'Ctrl+Shift+I', 'Ctrl+Shift+J', 'Ctrl+Shift+C', 'Ctrl+U',
-    'Ctrl+L', 'Ctrl+D', 'Ctrl+H', 'Ctrl+J', 'Ctrl+K',
-    'Ctrl+P', 'Ctrl+S',
-    // Screenshot / recording
-    'PrintScreen', 'Alt+PrintScreen',
-    'Super+Shift+S', 'Super+PrintScreen',
-    // Task Manager
-    'Ctrl+Shift+Escape',
-    // Clipboard
-    'Ctrl+C', 'Ctrl+V', 'Ctrl+X',
-  ];
+// FIX v1.0.6: dipisah jadi dua grup.
+// 1) alwaysBlocked   → selalu aktif (kontrol jendela/OS, devtools, screenshot dll)
+// 2) examOnlyBlocked → HANYA aktif saat examActive === true (clipboard, print,
+//    save, refresh, dsb). Di luar ujian, copy-paste & shortcut ini berfungsi
+//    normal — ini yang sebelumnya bikin isian text/login "nyangkut".
+const ALWAYS_BLOCKED_SHORTCUTS = [
+  // Windows system
+  'Super+D', 'Super+L', 'Super+Tab', 'Super+E', 'Super+R',
+  'Super+X', 'Super+S', 'Super+A', 'Super+M', 'Super+H',
+  'Super+Shift+S', 'Super+I', 'Super',
+  // Task switch (Alt+F4 dibiarkan → dialog keluar)
+  'Alt+Tab', 'Alt+Shift+Tab', 'Alt+Escape', 'Ctrl+Escape',
+  // Browser / dev tools
+  'F11', 'F12',
+  'Ctrl+Shift+I', 'Ctrl+Shift+J', 'Ctrl+Shift+C', 'Ctrl+U',
+  // Screenshot / recording
+  'PrintScreen', 'Alt+PrintScreen',
+  'Super+Shift+S', 'Super+PrintScreen',
+  // Task Manager
+  'Ctrl+Shift+Escape',
+];
 
-  blocked.forEach(sc => {
+const EXAM_ONLY_SHORTCUTS = [
+  'F5',
+  'Ctrl+R', 'Ctrl+Shift+R', 'Ctrl+F5',
+  'Ctrl+W', 'Ctrl+T', 'Ctrl+N', 'Ctrl+Shift+N',
+  'Ctrl+Tab', 'Ctrl+Shift+Tab',
+  'Ctrl+L', 'Ctrl+D', 'Ctrl+H', 'Ctrl+J', 'Ctrl+K',
+  'Ctrl+P', 'Ctrl+S',
+  'Ctrl+C', 'Ctrl+V', 'Ctrl+X',
+];
+
+let examShortcutsActive = false;
+
+function registerShortcuts() {
+  ALWAYS_BLOCKED_SHORTCUTS.forEach(sc => {
     try {
       globalShortcut.register(sc, () => {
         console.log('[ExamBro] Shortcut diblokir:', sc);
@@ -591,11 +580,41 @@ function registerShortcuts() {
   });
 }
 
+function registerExamOnlyShortcuts() {
+  if (examShortcutsActive) return;
+  EXAM_ONLY_SHORTCUTS.forEach(sc => {
+    try {
+      globalShortcut.register(sc, () => {
+        console.log('[ExamBro] Shortcut ujian diblokir:', sc);
+        handleViolation('shortcut_' + sc);
+      });
+    } catch (err) { }
+  });
+  examShortcutsActive = true;
+}
+
+function unregisterExamOnlyShortcuts() {
+  if (!examShortcutsActive) return;
+  EXAM_ONLY_SHORTCUTS.forEach(sc => {
+    try { globalShortcut.unregister(sc); } catch (err) { }
+  });
+  examShortcutsActive = false;
+}
+
+// Helper terpusat: set status ujian + otomatis pasang/lepas shortcut exam-only
+function setExamActive(active) {
+  examActive = active;
+  if (active) {
+    registerExamOnlyShortcuts();
+  } else {
+    unregisterExamOnlyShortcuts();
+  }
+}
+
 // ── Helper: cek domain diizinkan ──────────────────────────────────────────────
 function isAllowedUrl(url) {
   try {
     const parsed = new URL(url);
-    // file:// selalu diizinkan (untuk loading.html)
     if (parsed.protocol === 'file:') return true;
     return CONFIG.ALLOWED_DOMAINS.some(d =>
       parsed.hostname === d || parsed.hostname.endsWith('.' + d)
@@ -608,32 +627,32 @@ function isAllowedUrl(url) {
 // ── Dialog concurrent session ─────────────────────────────────────────────────
 function showConcurrentDialog() {
   if (!mainWindow) return;
+  isDialogOpen = true;
   dialog.showMessageBox(mainWindow, {
-    type:    'error',
-    title:   'Sesi Dihentikan',
+    type: 'error',
+    title: 'Sesi Dihentikan',
     message: 'Akun Anda login dari perangkat lain.',
-    detail:  'Sesi ujian ini dihentikan karena akun digunakan di perangkat lain.\nHubungi pengawas jika ini bukan Anda.',
+    detail: 'Sesi ujian ini dihentikan karena akun digunakan di perangkat lain.\nHubungi pengawas jika ini bukan Anda.',
     buttons: ['OK'],
-  });
+  }).finally(() => { isDialogOpen = false; });
 }
 
 // ── APP EVENTS ────────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
   psBlockerId = powerSaveBlocker.start('prevent-display-sleep');
 
-  // Restore cookies dari sesi sebelumnya (untuk Remember Me)
   restoreCookies();
 
-  // Setup header & filter SEBELUM createWindow
   setupExamBroHeaders();
   setupRequestFilter();
   createWindow();
   registerShortcuts();
 
   // Paksa fokus & alwaysOnTop — interval 2s
+  // FIX v1.0.6: dilewati selama isDialogOpen supaya tidak mengganggu dialog/input.
   const focusTimer = setInterval(() => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
-    if (isFocusing) return;
+    if (isFocusing || isDialogOpen) return;
     if (!mainWindow.isFocused() || !mainWindow.isFullScreen()) {
       mainWindow.setKiosk(true);
       mainWindow.setFullScreen(true);
@@ -651,7 +670,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  saveCookies(); // Simpan cookies sebelum tutup
+  saveCookies();
   if (psBlockerId !== null) powerSaveBlocker.stop(psBlockerId);
   globalShortcut.unregisterAll();
   if (process.platform === 'win32') {
@@ -663,7 +682,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
-  saveCookies(); // Simpan cookies saat quit
+  saveCookies();
   if (psBlockerId !== null) powerSaveBlocker.stop(psBlockerId);
   globalShortcut.unregisterAll();
   if (process.platform === 'win32') {
@@ -697,10 +716,10 @@ app.on('before-quit', (e) => {
         } catch(err) { return 'error:' + err.message; }
         return 'noform';
       })();
-    `).then(function(result) {
+    `).then(function (result) {
       console.log('[ExamBro] Before-quit submit result:', result);
       setTimeout(() => { app.quit(); }, 3000);
-    }).catch(function(err) {
+    }).catch(function (err) {
       console.error('[ExamBro] Before-quit submit error:', err);
       setTimeout(() => { app.quit(); }, 3000);
     });
